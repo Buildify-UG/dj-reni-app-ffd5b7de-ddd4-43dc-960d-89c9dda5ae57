@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Volume2, Play, Pause, RotateCcw, Zap, Waves, Radio, Gauge, Music } from 'lucide-react';
+import { Volume2, Play, Pause, RotateCcw, Zap, Waves, Radio, Gauge, Music, Repeat, Flag, Link2, Sliders, Grid3x3, Settings, Zap as ZapIcon, ChevronDown } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 
 interface Deck {
@@ -11,23 +11,39 @@ interface Deck {
   mid: number;
   treble: number;
   effect: string;
+  effectIntensity: number;
   tempo: number;
   currentTime: number;
   duration: number;
+  loopStart: number;
+  loopEnd: number;
+  loopActive: boolean;
+  cuePoint: number;
+  synced: boolean;
 }
 
-const EFFECTS = ['None', 'Reverb', 'Echo', 'Filter', 'Flanger', 'Phaser', 'Distortion'];
+interface Pad {
+  id: number;
+  name: string;
+  color: string;
+  active: boolean;
+}
+
+const EFFECTS = ['None', 'Reverb', 'Echo', 'Filter', 'Flanger', 'Phaser', 'Distortion', 'Delay', 'Chorus', 'Compressor'];
 
 const DJReni: React.FC = () => {
   const [decks, setDecks] = useState<Deck[]>([
-    { id: 1, title: 'Deck 1', playing: false, volume: 80, bass: 50, mid: 50, treble: 50, effect: 'None', tempo: 120, currentTime: 0, duration: 180 },
-    { id: 2, title: 'Deck 2', playing: false, volume: 80, bass: 50, mid: 50, treble: 50, effect: 'None', tempo: 120, currentTime: 0, duration: 180 },
-    { id: 3, title: 'Deck 3', playing: false, volume: 80, bass: 50, mid: 50, treble: 50, effect: 'None', tempo: 120, currentTime: 0, duration: 180 },
-    { id: 4, title: 'Deck 4', playing: false, volume: 80, bass: 50, mid: 50, treble: 50, effect: 'None', tempo: 120, currentTime: 0, duration: 180 },
+    { id: 1, title: 'Deck 1', playing: false, volume: 80, bass: 50, mid: 50, treble: 50, effect: 'None', effectIntensity: 50, tempo: 120, currentTime: 0, duration: 180, loopStart: 0, loopEnd: 180, loopActive: false, cuePoint: 0, synced: false },
+    { id: 2, title: 'Deck 2', playing: false, volume: 80, bass: 50, mid: 50, treble: 50, effect: 'None', effectIntensity: 50, tempo: 120, currentTime: 0, duration: 180, loopStart: 0, loopEnd: 180, loopActive: false, cuePoint: 0, synced: false },
+    { id: 3, title: 'Deck 3', playing: false, volume: 80, bass: 50, mid: 50, treble: 50, effect: 'None', effectIntensity: 50, tempo: 120, currentTime: 0, duration: 180, loopStart: 0, loopEnd: 180, loopActive: false, cuePoint: 0, synced: false },
+    { id: 4, title: 'Deck 4', playing: false, volume: 80, bass: 50, mid: 50, treble: 50, effect: 'None', effectIntensity: 50, tempo: 120, currentTime: 0, duration: 180, loopStart: 0, loopEnd: 180, loopActive: false, cuePoint: 0, synced: false },
   ]);
 
   const [masterVolume, setMasterVolume] = useState(90);
   const [crossfader, setCrossfader] = useState(50);
+  const [showPads, setShowPads] = useState(true);
+  const [selectedDeck, setSelectedDeck] = useState(1);
+  const [pads, setPads] = useState<Pad[]>(Array.from({ length: 8 }, (_, i) => ({ id: i + 1, name: `Pad ${i + 1}`, color: ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-cyan-500'][i], active: false })));
   const animationFrameRef = useRef<number>();
 
   // Simulate playback
@@ -61,29 +77,67 @@ const DJReni: React.FC = () => {
     updateDeck(id, { currentTime: 0, playing: false });
   };
 
+  const setCue = (id: number) => {
+    const deck = decks.find(d => d.id === id);
+    if (deck) updateDeck(id, { cuePoint: deck.currentTime });
+  };
+
+  const jumpToCue = (id: number) => {
+    const deck = decks.find(d => d.id === id);
+    if (deck) updateDeck(id, { currentTime: deck.cuePoint });
+  };
+
+  const toggleLoop = (id: number) => {
+    const deck = decks.find(d => d.id === id);
+    if (deck) updateDeck(id, { loopActive: !deck.loopActive });
+  };
+
+  const syncTempo = (id: number) => {
+    const mainDeck = decks.find(d => d.id === 1);
+    if (mainDeck) {
+      updateDeck(id, { tempo: mainDeck.tempo, synced: true });
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const triggerPad = (padId: number) => {
+    setPads(pads.map(p => p.id === padId ? { ...p, active: true } : p));
+    setTimeout(() => {
+      setPads(pads.map(p => p.id === padId ? { ...p, active: false } : p));
+    }, 200);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-black text-foreground p-6">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
               <Music className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-4xl font-black bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">DJ RENI</h1>
-              <p className="text-sm text-slate-400">Professional 4-Deck Mixing System</p>
+              <h1 className="text-3xl font-black bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">DJ RENI PRO</h1>
+              <p className="text-xs text-slate-400">Professional Cross DJ System</p>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-purple-400">{masterVolume}%</div>
-            <p className="text-xs text-slate-500">Master Volume</p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowPads(!showPads)}
+              className="bg-slate-700 hover:bg-slate-600 text-slate-200 p-2 rounded-lg transition-all"
+              title="Toggle Performance Pads"
+            >
+              <Grid3x3 className="w-5 h-5" />
+            </button>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-purple-400">{masterVolume}%</div>
+              <p className="text-xs text-slate-500">Master</p>
+            </div>
           </div>
         </div>
       </div>
@@ -127,8 +181,12 @@ const DJReni: React.FC = () => {
         </div>
       </div>
 
+      {/* Main Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+        {/* Left Sidebar - Decks */}
+        <div className="lg:col-span-3">
       {/* 4 Decks Grid */}
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         {decks.map((deck) => (
           <div
             key={deck.id}
